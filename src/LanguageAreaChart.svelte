@@ -1,7 +1,5 @@
 <script>
 import { onMount, getContext } from 'svelte'
-import Chart from 'chart.js'
-import 'chartjs-adapter-date-fns'
 import gql from 'nanographql-esm'
 
 var repoQuery = gql`
@@ -41,9 +39,6 @@ async function getRepositories(username, token, chart) {
         let res = await fetch('https://api.github.com/graphql', {
             body: repoQuery({name: username}),
             method: 'POST',
-            headers: {
-                'Authorization': `${token}`
-            }
         })
         res = await res.json()
         let repositories = res.data.user.repositories.nodes

@@ -1,6 +1,4 @@
 <script>
-import Chart from 'chart.js'
-
 export let user = ""
 </script>
 <div>
