@@ -17,7 +17,6 @@
   },
   "dependencies": {
     "d3": "^5.16.0",
-    "nanographql-esm": "^2.1.2",
     "sirv-cli": "^0.4.4"
   }
 }

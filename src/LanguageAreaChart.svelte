@@ -1,31 +1,9 @@
 <script>
-import { onMount, getContext } from 'svelte'
-import gql from 'nanographql-esm'
-
-var repoQuery = gql`
-query($name: String!) {
-    user (login: $name) {
-        repositories(first: 100, orderBy: {field: UPDATED_AT, direction: ASC}) {
-            nodes {
-                primaryLanguage {
-                    name
-                }
-                name
-                updatedAt
-                isFork
-                owner {
-                    login
-                }
-            }
-        }
-    }
-}
-`
+import { onMount } from 'svelte'
 
 export let user = ""
-let canvas;
+let root;
 let chart;
-const token = getContext('token')
 
 function randomNumber(max) {
     return Math.floor(Math.random() * max)
@@ -34,20 +12,24 @@ function randomColor() {
     return `rgb(${randomNumber(255)}, ${randomNumber(255)}, ${randomNumber(255)})`
 }
 
-async function getRepositories(username, token, chart) {
+async function getRepositories(username, chart) {
     try {
-        let res = await fetch('https://api.github.com/graphql', {
-            body: repoQuery({name: username}),
-            method: 'POST',
+        let url = new URL(`https://api.github.com/users/${user}/repos`)
+        url.searchParams.append("sort", "updated")
+        url.searchParams.append("direction", "desc")
+        let res = await fetch(url, {
+            method: 'GET',
+            headers: {
+                Accept: 'application/vnd.github.v3+json'
+            }
         })
-        res = await res.json()
-        let repositories = res.data.user.repositories.nodes
+        const repositories = await res.json()
 
         if(repositories.length > 0) {
             const languageMap = repositories.reduce((accum, value) => {
-                if(!value.primaryLanguage) return accum
+                if(!value.language) return accum
 
-                const key = value.primaryLanguage.name
+                const key = value.language.name
                 if(!accum.has(key)) {
                     accum.set(key, [])
                 }
@@ -78,19 +60,12 @@ async function getRepositories(username, token, chart) {
 }
 
 onMount(async () => {
-    chart = new Chart(canvas.getContext('2d'), {
-            type: 'polarArea',
-            options: {
-                scales: {
-                    responsive: true,
-                }
-            }
-        })
+
 })
 
-$: if(token && user !== "") getRepositories(user, token, chart)
+$: if(user !== "") getRepositories(user, chart)
 </script>
 <div>
     <h1>Languages for {user}</h1>
-    <canvas bind:this={canvas}></canvas>
+    <div bind:this={root}></div>
 </div>
