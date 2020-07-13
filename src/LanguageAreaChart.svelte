@@ -1,9 +1,15 @@
 <script>
 import { onMount } from 'svelte'
+import bb from "billboard.js"
+import { getRepositories, groupReposByLanguage, getUpdatedAt } from './model.js'
 
 export let user = ""
 let root;
 let chart;
+let languageMap;
+let dateMin = 0;
+let dateMax = 0;
+let dateCutoff = dateMin;
 
 function randomNumber(max) {
     return Math.floor(Math.random() * max)
@@ -12,60 +18,54 @@ function randomColor() {
     return `rgb(${randomNumber(255)}, ${randomNumber(255)}, ${randomNumber(255)})`
 }
 
-async function getRepositories(username, chart) {
-    try {
-        let url = new URL(`https://api.github.com/users/${user}/repos`)
-        url.searchParams.append("sort", "updated")
-        url.searchParams.append("direction", "desc")
-        let res = await fetch(url, {
-            method: 'GET',
-            headers: {
-                Accept: 'application/vnd.github.v3+json'
-            }
-        })
-        const repositories = await res.json()
-
-        if(repositories.length > 0) {
-            const languageMap = repositories.reduce((accum, value) => {
-                if(!value.language) return accum
-
-                const key = value.language.name
-                if(!accum.has(key)) {
-                    accum.set(key, [])
-                }
-
-                accum.get(key).push(value)
-                return accum
-            }, new Map())
-            const sortedLanguages = new Map([...languageMap].sort((a, b) => a[0] > b[0]))
-
-            chart.data.labels = [...sortedLanguages.keys()]
-            let data = []
-
-            for(const list of sortedLanguages.values()) {
-                data.push(list.length)
-            }
-
-            chart.data.datasets = [{
-                data: data,
-                backgroundColor: data.map(randomColor)
-            }]
-
-            chart.update()
+async function renderFullLanguages(promises) {
+    const resolved = await Promise.all(promises)
+    const languageMap = resolved.reduce(async (accum, languages) => {
+        for(const [language, loc] in languages) {
+            if(!accum.has(language)) accum.set(language, 0)
+            accum.set(language, accum.get(language) + loc)
         }
+    }, new Map())
+}
+
+function renderLanguages(languageMap) {
+    let columns = []
+
+    for(const [language, repos] of languageMap) {
+        columns.push([language, ...repos.map(() => 1)])
     }
-    catch(e) {
-        console.error(e)
-    }
+
+    chart.load({
+        columns
+    })
 }
 
 onMount(async () => {
-
+    chart = bb.generate({
+        bindto: root,
+        data: {
+            type: "pie",
+            columns: [],
+            empty: {
+                label: {
+                    text: "Select user to load data"
+                }
+            }
+        }
+    });
 })
 
-$: if(user !== "") getRepositories(user, chart)
+$: if(user !== "") getRepositories(user).then(repos => {
+    const updatedMap = repos.map(getUpdatedAt).map(Date.parse)
+    console.log(updatedMap)
+    dateMin = Math.min(...updatedMap)
+    dateMax = Math.max(...updatedMap)
+    dateCutoff = dateMin
+    renderLanguages(groupReposByLanguage(repos))
+})
 </script>
 <div>
     <h1>Languages for {user}</h1>
     <div bind:this={root}></div>
+    <input type="range" min={dateMin} max={dateMax} bind:value={dateCutoff}/>
 </div>
