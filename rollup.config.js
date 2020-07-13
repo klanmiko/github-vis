@@ -4,6 +4,7 @@ import commonjs from '@rollup/plugin-commonjs';
 import livereload from 'rollup-plugin-livereload';
 import { terser } from 'rollup-plugin-terser';
 import json from '@rollup/plugin-json';
+import nodeGlobals from 'rollup-plugin-node-globals';
 
 const production = !process.env.ROLLUP_WATCH;
 
@@ -35,9 +36,11 @@ export default {
 			browser: true,
 			dedupe: ['svelte'],
 			external: ['moment'],
+			preferBuiltins: false,
 		}),
 		commonjs(),
 		json(),
+		nodeGlobals(),
 
 		// In dev mode, call `npm run start` once
 		// the bundle has been generated
