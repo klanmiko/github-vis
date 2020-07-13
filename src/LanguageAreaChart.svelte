@@ -34,10 +34,10 @@ function renderLanguages(languageMap) {
     for(const [language, repos] of languageMap) {
         columns.push([language, ...repos.map(() => 1)])
     }
-    
-    chart.unload()
+
     chart.load({
-        columns: columns.filter(set => set.length > 1)
+        columns: columns.filter(set => set.length > 1),
+        unload: true
     })
 }
 
@@ -56,24 +56,30 @@ onMount(async () => {
     });
 })
 
-$: if(user !== "") getRepositories(user).then(repos => {
+async function loadRepositories(user) {
+    const repos = await getRepositories(user)
     const updatedMap = repos.map(getUpdatedAt)
     dateMin = Math.min(...updatedMap)
     dateMax = Math.max(...updatedMap)
     dateCutoff = dateMin
     languageMap = groupReposByLanguage(repos)
-})
-$: if(chart) {
+    renderLanguages(languageMap)
+}
+
+function updateDate() {
+    console.log("change")
     let cutoffMap = new Map()
     for(const [language, repos] of languageMap) {
         cutoffMap.set(language, repos.map(getUpdatedAt).filter(time => time > dateCutoff))
     }
-    console.log(cutoffMap)
     renderLanguages(cutoffMap)
 }
+
+$: if(user !== "") loadRepositories(user)
+
 </script>
 <div>
     <h1>Languages for {user}</h1>
     <div bind:this={root}></div>
-    <input type="range" min={dateMin} max={dateMax} bind:value={dateCutoff}/>
+    <input type="range" min={dateMin} max={dateMax} bind:value={dateCutoff} on:change={updateDate}/>
 </div>
