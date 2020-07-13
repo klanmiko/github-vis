@@ -6,7 +6,7 @@ import { getRepositories, groupReposByLanguage, getUpdatedAt } from './model.js'
 export let user = ""
 let root;
 let chart;
-let languageMap;
+let languageMap = new Map();
 let dateMin = 0;
 let dateMax = 0;
 let dateCutoff = dateMin;
@@ -34,9 +34,10 @@ function renderLanguages(languageMap) {
     for(const [language, repos] of languageMap) {
         columns.push([language, ...repos.map(() => 1)])
     }
-
+    
+    chart.unload()
     chart.load({
-        columns
+        columns: columns.filter(set => set.length > 1)
     })
 }
 
@@ -56,13 +57,20 @@ onMount(async () => {
 })
 
 $: if(user !== "") getRepositories(user).then(repos => {
-    const updatedMap = repos.map(getUpdatedAt).map(Date.parse)
-    console.log(updatedMap)
+    const updatedMap = repos.map(getUpdatedAt)
     dateMin = Math.min(...updatedMap)
     dateMax = Math.max(...updatedMap)
     dateCutoff = dateMin
-    renderLanguages(groupReposByLanguage(repos))
+    languageMap = groupReposByLanguage(repos)
 })
+$: if(chart) {
+    let cutoffMap = new Map()
+    for(const [language, repos] of languageMap) {
+        cutoffMap.set(language, repos.map(getUpdatedAt).filter(time => time > dateCutoff))
+    }
+    console.log(cutoffMap)
+    renderLanguages(cutoffMap)
+}
 </script>
 <div>
     <h1>Languages for {user}</h1>

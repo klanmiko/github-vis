@@ -34,7 +34,7 @@ export async function getRepositories(user) {
 }
 
 export function getUpdatedAt(repo) {
-    return repo.updated_at
+    return Date.parse(repo.updated_at)
 }
 
 export function groupReposByLanguage(repos) {
