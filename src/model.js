@@ -12,7 +12,7 @@ initIPFSInstance().then(async ipfs => {
   const orbitdb = await OrbitDB.createInstance(ipfs);
 
   // Create / Open a database
-  const db = await orbitdb.docs("hello");
+  const db = await orbitdb.log("hello");
   await db.load();
 
   // Listen for updates from peers
