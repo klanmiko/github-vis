@@ -1,66 +1,137 @@
 import IPFS from 'ipfs'
 import OrbitDB from 'orbit-db'
+import { repo } from 'ipfs/src/core/components';
 
-// For js-ipfs >= 0.38
+class SwarmDB {
+    constructor(ipfs) {
+        this.orbitdb = OrbitDB.createInstance(ipfs);
+    }
 
-// Create IPFS instance
-const initIPFSInstance = async () => {
-  return await IPFS.create({ repo: "./path-for-js-ipfs-repo" });
-};
+    async init() {
+        const orbitdb = await this.orbitdb
+        this.db_repos = orbitdb.docs("github-vis:repos")
+        this.db_topics = orbitdb.keyvalue("github-vis:topics")
+        this.db_languages = orbitdb.keyvalue("github-vis:languages")
+    }
 
-initIPFSInstance().then(async ipfs => {
-  const orbitdb = await OrbitDB.createInstance(ipfs);
+    async putRepository(repo) {
+        const db_repos = await this.db_repos
+        const new_doc = {
+            _id: repo._id || repo.id,
+            owner: {
+                login: repo.owner.login
+            },
+            language: repo.language,
+            languages_url: repo.languages_url,
+            tags_url: repo.tags_url,
+            updated_at: repo.updated_at
+        }
 
-  // Create / Open a database
-  const db = await orbitdb.log("hello");
-  await db.load();
+        return await db_repos.put(new_doc)
+    }
 
-  // Listen for updates from peers
-  db.events.on("replicated", address => {
-    console.log(db.iterator({ limit: -1 }).collect());
-  });
+    async getRepositories(user) {
+        const db_repos = await this.db_repos
+        return await db_repos.query(repo => repo.owner.login = user)
+    }
 
-  // Add an entry
-  const hash = await db.add("world");
-  console.log(hash);
+    async getRepositoryLanguages(repo) {
 
-  // Query
-  const result = db.iterator({ limit: -1 }).collect();
-  console.log(JSON.stringify(result, null, 2));
-});
+    }
 
-export async function getRepositoryLanguages(repo) {
-    try {
-        const res = await fetch(repo.languages_url, {
-            method: 'GET',
-            headers: {
-                Accept: 'application/vnd.github.v3+json'
-            }
-        })
+    async putRepositoryLanguage(repo, language) {
 
-        return await res.json()
-    } catch(e) {
-        console.error(e)
+    }
+
+    async getRepositoryTopics(repo) {
+
+    }
+
+    async putRepositoryTopic(repo, topic) {
+
     }
 }
 
-export async function getRepositories(user) {
-    try {
-        let url = new URL(`https://api.github.com/users/${user}/repos`)
-        url.searchParams.append("sort", "updated")
-        url.searchParams.append("direction", "desc")
-        let res = await fetch(url, {
-            method: 'GET',
-            headers: {
-                Accept: 'application/vnd.github.v3+json'
-            }
-        })
-        // renderFullLanguages(repos.map(repo => getRepositoryLanguages(repo))) rate limiting issue
-
-        return await res.json()
+class GitHubAPI {
+    static get defaultOptions() {
+        return {}
     }
-    catch(e) {
-        console.error(e)
+
+    constructor(options) {
+        this.options = {
+            ...GitHubAPI.defaultOptions,
+            ...options
+        }
+    }
+
+    async getRepositoryLanguages(repo) {
+        try {
+            const res = await fetch(repo.languages_url, {
+                method: 'GET',
+                headers: {
+                    Accept: 'application/vnd.github.v3+json'
+                }
+            })
+    
+            return await res.json()
+        } catch(e) {
+            console.error(e)
+        }
+    }
+
+    async getRepositories(user) {
+        try {
+            let url = new URL(`https://api.github.com/users/${user}/repos`)
+            url.searchParams.append("sort", "updated")
+            url.searchParams.append("direction", "desc")
+            let res = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    Accept: 'application/vnd.github.v3+json'
+                }
+            })
+    
+            return await res.json()
+        }
+        catch(e) {
+            console.error(e)
+        }
+    }
+}
+
+const initIPFSInstance = async () => {
+    const ipfs = await IPFS.create();
+    const db =  new SwarmDB(ipfs)
+    await db.init()
+    return db
+};
+
+const swarmAPI = initIPFSInstance()
+
+const githubAPI = new GitHubAPI()
+
+export async function getRepositoryLanguages(repo) {
+    const languages = await githubAPI.getRepositoryLanguages(repo)
+    return languages
+}
+
+export async function getRepositories(user) {
+    const swarmDB = await swarmAPI
+    const putAllRepos = async repositories => {
+        for(const repo of repositories) {
+            const hash = await swarmDB.putRepository(repo)
+            console.log(hash)
+            break
+        }
+    }
+    const repos =  await swarmDB.getRepositories(user)
+    if(repos.length == 0) {
+        const repositories = await githubAPI.getRepositories(user)
+        putAllRepos(repositories)
+        return repositories
+    } else {
+        console.log(repos)
+        return repos
     }
 }
 
